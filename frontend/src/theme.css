@@ -1,0 +1,417 @@
+/* Accent color themes. Every brand color in the app reads these variables,
+   so switching data-accent on <html> recolors the login page and all modules. */
+:root,
+:root[data-accent="indigo"] {
+  --accent-700: #3f37b5;
+  --accent-600: #4f46e5;
+  --accent-500: #5b50dc;
+  --accent-400: #6c63e6;
+  --accent-300: #8b84ec;
+  --accent-200: #c9c5f2;
+  --accent-100: #efedff;
+  --accent-50: #f7f6ff;
+  --accent-alt: #7c3aed;
+  --accent-alt-light: #a78bfa;
+  --accent-rgb: 91, 80, 220;
+}
+
+:root[data-accent="blue"] {
+  --accent-700: #1d4ed8;
+  --accent-600: #2563eb;
+  --accent-500: #3b82f6;
+  --accent-400: #60a5fa;
+  --accent-300: #93c5fd;
+  --accent-200: #bfdbfe;
+  --accent-100: #dbeafe;
+  --accent-50: #eff6ff;
+  --accent-alt: #0ea5e9;
+  --accent-alt-light: #7dd3fc;
+  --accent-rgb: 59, 130, 246;
+}
+
+:root[data-accent="violet"] {
+  --accent-700: #6d28d9;
+  --accent-600: #7c3aed;
+  --accent-500: #8b5cf6;
+  --accent-400: #a78bfa;
+  --accent-300: #c4b5fd;
+  --accent-200: #ddd6fe;
+  --accent-100: #ede9fe;
+  --accent-50: #f5f3ff;
+  --accent-alt: #c026d3;
+  --accent-alt-light: #f0abfc;
+  --accent-rgb: 139, 92, 246;
+}
+
+:root[data-accent="emerald"] {
+  --accent-700: #047857;
+  --accent-600: #059669;
+  --accent-500: #10b981;
+  --accent-400: #34d399;
+  --accent-300: #6ee7b7;
+  --accent-200: #a7f3d0;
+  --accent-100: #d1fae5;
+  --accent-50: #ecfdf5;
+  --accent-alt: #0d9488;
+  --accent-alt-light: #5eead4;
+  --accent-rgb: 16, 185, 129;
+}
+
+:root[data-accent="rose"] {
+  --accent-700: #be123c;
+  --accent-600: #e11d48;
+  --accent-500: #f43f5e;
+  --accent-400: #fb7185;
+  --accent-300: #fda4af;
+  --accent-200: #fecdd3;
+  --accent-100: #ffe4e6;
+  --accent-50: #fff1f2;
+  --accent-alt: #db2777;
+  --accent-alt-light: #f9a8d4;
+  --accent-rgb: 244, 63, 94;
+}
+
+:root[data-accent="orange"] {
+  --accent-700: #c2410c;
+  --accent-600: #ea580c;
+  --accent-500: #f97316;
+  --accent-400: #fb923c;
+  --accent-300: #fdba74;
+  --accent-200: #fed7aa;
+  --accent-100: #ffedd5;
+  --accent-50: #fff7ed;
+  --accent-alt: #f59e0b;
+  --accent-alt-light: #fcd34d;
+  --accent-rgb: 249, 115, 22;
+}
+
+:root[data-accent="slate"] {
+  --accent-700: #1e293b;
+  --accent-600: #334155;
+  --accent-500: #475569;
+  --accent-400: #64748b;
+  --accent-300: #94a3b8;
+  --accent-200: #cbd5e1;
+  --accent-100: #e2e8f0;
+  --accent-50: #f1f5f9;
+  --accent-alt: #0f172a;
+  --accent-alt-light: #94a3b8;
+  --accent-rgb: 71, 85, 105;
+}
+
+/* ===== Theme picker ===== */
+.theme-picker {
+  position: relative;
+}
+
+.theme-chip {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25), 0 2px 6px rgba(15, 23, 42, .18);
+}
+
+.theme-chip.small {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+}
+
+.theme-picker-trigger {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #e3e6ee;
+  border-radius: 10px;
+  color: var(--accent-600);
+  background: #fff;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+
+.theme-picker-trigger:hover,
+.theme-picker-trigger[aria-expanded="true"] {
+  border-color: var(--accent-300);
+  background: var(--accent-50);
+}
+
+.theme-picker-trigger:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .25);
+}
+
+.theme-picker-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 60;
+  width: 300px;
+  overflow: hidden;
+  border: 1px solid #e6e8ef;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, .18), 0 2px 8px rgba(15, 23, 42, .06);
+  animation: theme-popover-in .14s ease-out;
+}
+
+@keyframes theme-popover-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.theme-popover-header {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid #f0f1f5;
+}
+
+.theme-popover-header strong {
+  display: block;
+  color: #111827;
+  font-size: .86rem;
+}
+
+.theme-popover-header span {
+  display: block;
+  margin-top: 2px;
+  color: #8a92a5;
+  font-size: .72rem;
+}
+
+.theme-list {
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+}
+
+.theme-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background .12s ease;
+}
+
+.theme-list-item:hover {
+  background: #f6f7fa;
+}
+
+.theme-list-item[aria-checked="true"] {
+  background: var(--accent-50);
+}
+
+.theme-list-item:focus-visible {
+  outline: 0;
+  box-shadow: inset 0 0 0 2px var(--accent-300);
+}
+
+.theme-list-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.theme-list-text strong {
+  display: block;
+  color: #1f2937;
+  font-size: .82rem;
+  font-weight: 600;
+}
+
+.theme-list-text small {
+  display: block;
+  margin-top: 1px;
+  color: #8a92a5;
+  font-size: .7rem;
+}
+
+.theme-list-check {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  color: var(--accent-600);
+}
+
+.theme-popover-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid #f0f1f5;
+  background: #fafbfc;
+  color: #9aa1af;
+  font-size: .7rem;
+}
+
+.theme-popover-footer button {
+  padding: 0;
+  border: 0;
+  color: var(--accent-600);
+  background: none;
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.theme-popover-footer button:disabled {
+  color: #c2c7d0;
+  cursor: default;
+}
+
+/* Login page trigger: glass pill showing the current theme */
+.login-theme-picker {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 50;
+}
+
+.login-theme-picker .theme-picker-trigger {
+  width: auto;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 14px 0 11px;
+  border-color: rgba(255, 255, 255, .4);
+  color: #fff;
+  background: rgba(255, 255, 255, .14);
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+}
+
+.login-theme-picker .theme-picker-trigger .theme-chip {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .85);
+}
+
+.login-theme-picker .theme-picker-trigger:hover,
+.login-theme-picker .theme-picker-trigger[aria-expanded="true"] {
+  border-color: rgba(255, 255, 255, .8);
+  background: rgba(255, 255, 255, .24);
+}
+
+/* Settings page preview cards */
+.theme-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 14px;
+}
+
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e3e6ee;
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+.theme-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, .08);
+}
+
+.theme-card[aria-checked="true"] {
+  border-color: var(--accent-500);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .18);
+}
+
+.theme-card:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .3);
+}
+
+.theme-card-preview {
+  display: flex;
+  height: 74px;
+  border-bottom: 1px solid #f0f1f5;
+  background: #f7f8fc;
+}
+
+.theme-card-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 30%;
+  padding: 10px 7px;
+  border-right: 1px solid #eceef3;
+  background: #fff;
+}
+
+.theme-card-sidebar i {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: #e6e8ee;
+}
+
+.theme-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px;
+}
+
+.theme-card-bar {
+  height: 12px;
+  border-radius: 4px;
+}
+
+.theme-card-line {
+  height: 5px;
+  border-radius: 3px;
+  background: #dfe2ea;
+}
+
+.theme-card-line.short {
+  width: 60%;
+}
+
+.theme-card-button {
+  width: 42%;
+  height: 10px;
+  margin-top: auto;
+  margin-left: auto;
+  border-radius: 4px;
+}
+
+.theme-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+}
+
+.theme-card-footer strong {
+  flex: 1;
+  color: #303a4d;
+  font-size: .76rem;
+  font-weight: 600;
+}
+
+.theme-card-check {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--accent-600);
+}
