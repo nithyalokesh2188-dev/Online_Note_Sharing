@@ -106,13 +106,10 @@ function Login({ onLoginSuccess }) {
     if (error) setError('');
   };
 
+  // There is no email-based password reset, so point users to their administrator.
   const handleForgotPassword = () => {
-    if (!email.trim()) {
-      setErrors({ email: 'Please enter your email address.' });
-      return;
-    }
     setResetDone(true);
-    setTimeout(() => setResetDone(false), 3000);
+    setTimeout(() => setResetDone(false), 6000);
   };
 
   return (
@@ -150,7 +147,7 @@ function Login({ onLoginSuccess }) {
           </div>
 
           <div className="brand-footer">
-            <p>Join thousands of students learning together</p>
+            <p>An independent student project for sharing study notes</p>
           </div>
         </aside>
 
@@ -174,7 +171,7 @@ function Login({ onLoginSuccess }) {
             {resetDone && (
               <div className="reset-success-alert">
                 <Icon name="check" size={18} />
-                <span>Password reset link sent to your email.</span>
+                <span>Passwords are reset by your administrator. Please contact them to set a new password.</span>
               </div>
             )}
 
@@ -281,7 +278,8 @@ function Login({ onLoginSuccess }) {
 
             {/* Sign up link */}
             <div className="login-footer">
-              <p>Don't have an account? <a href="/signup">Create one now</a></p>
+              <p>Don't have an account? Ask your administrator to invite you.</p>
+              <p className="login-disclaimer">Notes Sharing is an independent student project. It is not affiliated with any university or company.</p>
             </div>
           </div>
         </main>
