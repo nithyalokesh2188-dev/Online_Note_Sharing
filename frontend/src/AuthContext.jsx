@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { API_BASE_URL } from "./config";
 
 const AuthContext = createContext();
-const API_BASE_URL = "http://localhost:5000";
 
 async function readJson(response) {
   const contentType = response.headers.get("content-type") || "";

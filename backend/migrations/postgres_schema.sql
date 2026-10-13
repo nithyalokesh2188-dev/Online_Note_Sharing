@@ -94,3 +94,11 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_user_read_created ON notifications (user_id, is_read, created_at);
+
+-- Copies of uploaded files, so uploads survive hosts with temporary disks (e.g. Render free tier).
+CREATE TABLE IF NOT EXISTS stored_files (
+    file_name VARCHAR(255) PRIMARY KEY,
+    content BYTEA NOT NULL,
+    size INT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

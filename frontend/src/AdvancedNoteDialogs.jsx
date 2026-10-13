@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./advanced-features.css";
+import { API_BASE_URL } from "./config";
 
-const API_BASE_URL = "http://localhost:5000";
 
 async function requestJson(url, options) {
   const response = await fetch(url, { ...options, credentials: "include" });

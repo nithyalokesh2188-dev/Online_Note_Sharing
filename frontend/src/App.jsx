@@ -6,6 +6,7 @@ import "./app.css";
 import { AuthProvider, useAuth } from "./AuthContext";
 import Login from "./Login";
 import { ThemePicker, ThemeSwatches } from "./ThemePicker";
+import { API_BASE_URL } from "./config";
 
 const navigation = [
   { label: "Dashboard", icon: "grid" },
@@ -77,7 +78,6 @@ const uploadInitialForm = {
 const acceptedFileTypes = ["pdf", "csv", "xls", "xlsx", "doc", "docx", "ppt", "pptx", "jpg", "jpeg", "png"];
 const maxFileSize = 10 * 1024 * 1024;
 const acceptedFileLabel = "PDF, CSV, XLS, XLSX, DOC, DOCX, PPT, PPTX, JPG, JPEG, PNG";
-const API_BASE_URL = "http://localhost:5000";
 const apiFetch = (url, options = {}) => fetch(url, { ...options, credentials: "include" });
 const getNoteIdFromPath = () => {
   const match = window.location.pathname.match(/^\/notes\/([1-9]\d*)\/?$/);

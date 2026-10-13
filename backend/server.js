@@ -25,7 +25,7 @@ console.info(`AI_MODEL present: ${aiConfigStatus.modelPresent ? "true" : "false"
 
 const configuredOrigins = (process.env.FRONTEND_ORIGINS || "")
     .split(",")
-    .map((origin) => origin.trim())
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
     .filter(Boolean);
 const allowedOrigins = new Set([
     "http://localhost:5173",
@@ -46,13 +46,26 @@ app.use(cors({
     },
     credentials: true,
 }));
-const databaseConfig = {
-    host: process.env.DB_HOST || "localhost",
-    port: Number(process.env.DB_PORT) || 5432,
-    user: process.env.DB_USER || "postgres",
-    password: process.env.DB_PASSWORD || "",
-    database: process.env.DB_NAME || "notesharing",
+// Hosted databases (Neon, Render, etc.) provide one DATABASE_URL and require SSL;
+// local development uses the separate DB_* settings.
+const databaseConfig = process.env.DATABASE_URL
+    ? { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }
+    : {
+        host: process.env.DB_HOST || "localhost",
+        port: Number(process.env.DB_PORT) || 5432,
+        user: process.env.DB_USER || "postgres",
+        password: process.env.DB_PASSWORD || "",
+        database: process.env.DB_NAME || "notesharing",
+    };
+// In production the frontend (e.g. *.vercel.app) and API (e.g. *.onrender.com) are different
+// sites, so the session cookie must be SameSite=None and Secure to be sent with API requests.
+const isProduction = process.env.NODE_ENV === "production";
+const sessionCookieOptions = {
+    httpOnly: true,
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
 };
+if (isProduction) app.set("trust proxy", 1);
 const PgStore = PgStoreFactory(session);
 const sessionStore = new PgStore({
     conObject: databaseConfig,
@@ -67,14 +80,21 @@ app.use(session({
     saveUninitialized: false,
     rolling: true,
     cookie: {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        ...sessionCookieOptions,
         maxAge: 12 * 60 * 60 * 1000,
     },
 }));
 const uploadDirectory = path.join(__dirname, "uploads");
 fs.mkdirSync(uploadDirectory, { recursive: true });
+app.use("/uploads", (req, res, next) => {
+    let fileName;
+    try {
+        fileName = decodeURIComponent(req.path.replace(/^\/+/, ""));
+    } catch {
+        return next();
+    }
+    restoreUploads([fileName], next);
+});
 app.use("/uploads", express.static(uploadDirectory));
 
 const publicRequests = new Set([
@@ -240,6 +260,39 @@ function findNoteDuplicates({ title, subject, fileName, fileHash }, callback) {
             return { id: row.id, title: row.title, subject: row.subject, file_name: row.file_name, reasons };
         });
         callback(null, matches);
+    });
+}
+
+// Hosts such as Render wipe the local disk on every restart, so each upload is also kept in
+// PostgreSQL (stored_files) and written back to the uploads folder whenever a request needs it.
+function storeUploadedFile(file, callback) {
+    fs.readFile(file.path, (readError, content) => {
+        if (readError) return callback(readError);
+        db.query(
+            "INSERT INTO stored_files (file_name, content, size) VALUES (?, ?, ?) ON CONFLICT (file_name) DO NOTHING",
+            [path.basename(file.filename), content, content.length],
+            (storeError) => callback(storeError || null)
+        );
+    });
+}
+
+function restoreUploads(storedPaths, callback) {
+    const missing = [...new Set(storedPaths.filter(Boolean).map((storedPath) => path.basename(String(storedPath))))]
+        .filter((fileName) => !fs.existsSync(path.join(uploadDirectory, fileName)));
+    if (!missing.length) return callback();
+    db.query("SELECT file_name, content FROM stored_files WHERE file_name = ANY(?)", [missing], (err, rows) => {
+        if (err) {
+            console.error("Could not restore uploaded files from the database:", err.message);
+            return callback();
+        }
+        for (const row of rows) {
+            try {
+                fs.writeFileSync(path.join(uploadDirectory, path.basename(row.file_name)), row.content);
+            } catch (writeError) {
+                console.error("Could not write restored upload:", writeError.message);
+            }
+        }
+        callback();
     });
 }
 
@@ -409,7 +462,13 @@ app.post("/notes", noteFileUpload.single("file"), (req, res) => {
                 description || null, tags || null, req.file.originalname, filePath, userId, fileHash
             ];
 
-            db.beginTransaction((transactionError) => {
+            storeUploadedFile(req.file, (storeError) => {
+            if (storeError) {
+                console.error("Could not store the uploaded file:", storeError.message);
+                removeUploadedFile(req.file.path);
+                return res.status(500).json({ message: "Could not store the uploaded file." });
+            }
+            db.beginTransaction((transactionError, tx) => {
                 if (transactionError) {
                     removeUploadedFile(req.file.path);
                     return res.status(500).json({ message: "Could not start saving the uploaded note." });
@@ -417,16 +476,16 @@ app.post("/notes", noteFileUpload.single("file"), (req, res) => {
 
                 const rollbackUpload = (message, error) => {
                     if (error) console.error(message, error.message);
-                    db.rollback(() => {
+                    tx.rollback(() => {
                         removeUploadedFile(req.file.path);
                         if (!res.headersSent) res.status(500).json({ message });
                     });
                 };
 
-                db.query(sql, values, (insertError, result) => {
+                tx.query(sql, values, (insertError, result) => {
                     if (insertError) return rollbackUpload("Could not save uploaded note.", insertError);
 
-                    db.query(
+                    tx.query(
                         `INSERT INTO note_versions
                             (note_id, version_number, file_name, file_path, file_hash, updated_by)
                          VALUES (?, 1, ?, ?, ?, ?)`,
@@ -434,7 +493,7 @@ app.post("/notes", noteFileUpload.single("file"), (req, res) => {
                         (versionError) => {
                             if (versionError) return rollbackUpload("Could not create initial note version.", versionError);
 
-                            db.commit((commitError) => {
+                            tx.commit((commitError) => {
                                 if (commitError) return rollbackUpload("Could not complete uploaded note transaction.", commitError);
                                 res.status(201).json({
                                     message: "Note uploaded successfully.",
@@ -460,6 +519,7 @@ app.post("/notes", noteFileUpload.single("file"), (req, res) => {
                         }
                     );
                 });
+            });
             });
         });
     });
@@ -692,41 +752,47 @@ app.post("/notes/:noteId/versions", noteFileUpload.single("file"), (req, res) =>
         stream.on("data", (chunk) => hash.update(chunk));
         stream.on("end", () => {
             const fileHash = hash.digest("hex");
-            db.beginTransaction((transactionError) => {
+            storeUploadedFile(req.file, (storeError) => {
+            if (storeError) {
+                console.error("Could not store the uploaded file:", storeError.message);
+                removeUploadedFile(req.file.path);
+                return res.status(500).json({ message: "Could not store the uploaded file." });
+            }
+            db.beginTransaction((transactionError, tx) => {
                 if (transactionError) {
                     removeUploadedFile(req.file.path);
                     return res.status(500).json({ message: "Could not start the version update." });
                 }
 
-                db.query("SELECT COALESCE(MAX(version_number), 0) + 1 AS next_version FROM note_versions WHERE note_id = ?", [noteId], (versionError, versionRows) => {
-                    if (versionError) return db.rollback(() => {
+                tx.query("SELECT COALESCE(MAX(version_number), 0) + 1 AS next_version FROM note_versions WHERE note_id = ?", [noteId], (versionError, versionRows) => {
+                    if (versionError) return tx.rollback(() => {
                         removeUploadedFile(req.file.path);
                         res.status(500).json({ message: "Could not determine the next version number." });
                     });
 
                     const versionNumber = Number(versionRows[0].next_version);
                     const filePath = `/uploads/${path.basename(req.file.filename)}`;
-                    db.query(
+                    tx.query(
                         `INSERT INTO note_versions
                             (note_id, version_number, file_name, file_path, file_hash, updated_by)
                          VALUES (?, ?, ?, ?, ?, ?)`,
                         [noteId, versionNumber, req.file.originalname, filePath, fileHash, userId],
                         (insertError, result) => {
-                            if (insertError) return db.rollback(() => {
+                            if (insertError) return tx.rollback(() => {
                                 removeUploadedFile(req.file.path);
                                 res.status(500).json({ message: "Could not save note version history." });
                             });
 
-                            db.query(
+                            tx.query(
                                 "UPDATE notes SET file_name = ?, file_path = ?, file_hash = ?, uploaded_at = CURRENT_TIMESTAMP WHERE id = ? AND uploaded_by = ?",
                                 [req.file.originalname, filePath, fileHash, noteId, userId],
                                 (updateError) => {
-                                    if (updateError) return db.rollback(() => {
+                                    if (updateError) return tx.rollback(() => {
                                         removeUploadedFile(req.file.path);
                                         res.status(500).json({ message: "Could not set the latest note version." });
                                     });
-                                    db.commit((commitError) => {
-                                        if (commitError) return db.rollback(() => {
+                                    tx.commit((commitError) => {
+                                        if (commitError) return tx.rollback(() => {
                                             removeUploadedFile(req.file.path);
                                             res.status(500).json({ message: "Could not complete the version update." });
                                         });
@@ -751,6 +817,7 @@ app.post("/notes/:noteId/versions", noteFileUpload.single("file"), (req, res) =>
                     );
                 });
             });
+            });
         });
     });
 });
@@ -767,11 +834,11 @@ app.get("/note-versions/:versionId/download", (req, res) => {
             if (err) return res.status(500).json({ message: "Could not load this note version." });
             if (!versions.length) return res.status(404).json({ message: "Note version not found." });
             const absolutePath = path.join(uploadDirectory, path.basename(versions[0].file_path));
-            res.download(absolutePath, path.basename(versions[0].file_name), (downloadError) => {
+            restoreUploads([versions[0].file_path], () => res.download(absolutePath, path.basename(versions[0].file_name), (downloadError) => {
                 if (downloadError && !res.headersSent) {
                     res.status(downloadError.code === "ENOENT" ? 404 : 500).json({ message: "The note version file is unavailable." });
                 }
-            });
+            }));
         }
     );
 });
@@ -786,11 +853,11 @@ app.get("/notes/:noteId/download", (req, res) => {
         if (!notes.length) return res.status(404).json({ message: "Note not found." });
         const resolved = resolveStoredUploadPath(notes[0].file_path);
         if (!resolved) return res.status(400).json({ message: "The stored note file path is invalid." });
-        res.download(resolved.absolutePath, path.basename(notes[0].file_name || resolved.fileName), (downloadError) => {
+        restoreUploads([notes[0].file_path], () => res.download(resolved.absolutePath, path.basename(notes[0].file_name || resolved.fileName), (downloadError) => {
             if (downloadError && !res.headersSent) {
                 res.status(downloadError.code === "ENOENT" ? 404 : 500).json({ message: "The note file is unavailable." });
             }
-        });
+        }));
     });
 });
 
@@ -933,27 +1000,29 @@ function loadNoteForAi(noteId, callback) {
                     }
 
                     const candidates = [...versions, { file_name: note.file_name, file_path: note.file_path }];
-                    const seenPaths = new Set();
-                    let lastFailure = null;
-                    for (const candidate of candidates) {
-                        const key = String(candidate.file_path || "").replace(/\\/g, "/");
-                        if (!key || seenPaths.has(key)) continue;
-                        seenPaths.add(key);
+                    restoreUploads(candidates.map((candidate) => candidate.file_path), () => {
+                        const seenPaths = new Set();
+                        let lastFailure = null;
+                        for (const candidate of candidates) {
+                            const key = String(candidate.file_path || "").replace(/\\/g, "/");
+                            if (!key || seenPaths.has(key)) continue;
+                            seenPaths.add(key);
 
-                        const checked = inspectAiFileCandidate(noteId, candidate);
-                        if (checked.valid) {
-                            note.file_name = candidate.file_name;
-                            note.file_path = checked.filePath;
-                            note.file_hash = null;
-                            return callback(null, note);
+                            const checked = inspectAiFileCandidate(noteId, candidate);
+                            if (checked.valid) {
+                                note.file_name = candidate.file_name;
+                                note.file_path = checked.filePath;
+                                note.file_hash = null;
+                                return callback(null, note);
+                            }
+                            lastFailure = checked;
                         }
-                        lastFailure = checked;
-                    }
 
-                    callback(Object.assign(
-                        new Error(lastFailure?.message || "No valid stored file is available for this note."),
-                        { status: lastFailure?.status || 404 }
-                    ));
+                        callback(Object.assign(
+                            new Error(lastFailure?.message || "No valid stored file is available for this note."),
+                            { status: lastFailure?.status || 404 }
+                        ));
+                    });
                 }
             );
         }
@@ -1350,11 +1419,7 @@ app.get("/auth/me", (req, res) => {
 app.post("/auth/logout", (req, res) => {
     req.session.destroy((err) => {
         if (err) return res.status(500).json({ message: "Could not end your session." });
-        res.clearCookie("notes.sid", {
-            httpOnly: true,
-            sameSite: "lax",
-            secure: process.env.NODE_ENV === "production",
-        });
+        res.clearCookie("notes.sid", sessionCookieOptions);
         res.json({ message: "Signed out successfully." });
     });
 });

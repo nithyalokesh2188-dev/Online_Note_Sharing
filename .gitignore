@@ -20,3 +20,9 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Database dumps / backups (may contain user data)
+Datababse backup/
+*.dump
+*.backup
+*.sql.gz
